@@ -75,6 +75,22 @@ function replaceFocusedWordWithFilter(
   key: string,
   getFieldDefinition: FieldDefinitionGetter
 ) {
+  if (key.includes(':')) {
+    const words = value.split(' ');
+
+    let characterCount = 0;
+    for (const word of words) {
+      characterCount += word.length + 1;
+      if (characterCount >= cursorPosition) {
+        return (
+          value.slice(0, characterCount - word.length - 1).trim() +
+          ` ${key} ` +
+          value.slice(characterCount).trim()
+        ).trim();
+      }
+    }
+  }
+
   const words = value.split(' ');
 
   let characterCount = 0;
@@ -116,6 +132,19 @@ function calculateNextFocusForFilter(state: ListState<ParseResultToken>): FocusO
   return {
     itemKey: `${Token.FILTER}:${numPreviousFilterItems}`,
     part: 'value',
+  };
+}
+
+function calculateNextFocusForFreeText(
+  state: ListState<ParseResultToken>
+): FocusOverride {
+  const numPreviousFreeTextItems = countPreviousItemsOfType({
+    state,
+    type: Token.FREE_TEXT,
+  });
+
+  return {
+    itemKey: `${Token.FREE_TEXT}:${numPreviousFreeTextItems}`,
   };
 }
 
@@ -336,6 +365,39 @@ function SearchQueryBuilderInputInternal({
           }
 
           const value = option.value;
+
+          if (value.includes(':')) {
+            dispatch({
+              type: 'UPDATE_FREE_TEXT',
+              tokens: [token],
+              text: replaceFocusedWordWithFilter(
+                inputValue,
+                selectionIndex,
+                value,
+                getFieldDefinition
+              ),
+              focusOverride: calculateNextFocusForFilter(state),
+            });
+            resetInputValue();
+            return;
+          }
+
+          // Raw search text
+          if (value.startsWith('"')) {
+            dispatch({
+              type: 'UPDATE_FREE_TEXT',
+              tokens: [token],
+              text: replaceFocusedWordWithFilter(
+                inputValue,
+                selectionIndex,
+                value,
+                getFieldDefinition
+              ),
+              focusOverride: calculateNextFocusForFreeText(state),
+            });
+            resetInputValue();
+            return;
+          }
 
           dispatch({
             type: 'UPDATE_FREE_TEXT',
